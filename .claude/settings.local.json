@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\Diosem_work_manager_sales\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName, PSIsContainer)",
+      "Bash(Sort-Object FullName)",
+      "Bash(ConvertTo-Json)",
+      "PowerShell(tree /F \"D:\\\\Diosem_work_manager_sales\" -L 3 2>$null)",
+      "PowerShell(head -100)",
+      "Bash(ls -la \"D:\\\\Diosem_Workers\" | head -50)",
+      "Read(//d/Diosem_Workers/**)",
+      "Bash(npm --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
