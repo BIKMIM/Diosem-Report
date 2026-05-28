@@ -36,11 +36,22 @@ const parseLeave = (line) => {
   };
 };
 
+// " / " 또는 줄 끝의 "/" 모두 허용 (작업자 미배정 라인 처리)
+const hasSlash = (s) => {
+  const t = s.trim();
+  return t.includes(' / ') || t.endsWith(' /') || t.endsWith('/');
+};
+const normalizeSlash = (s) => {
+  if (s.includes(' / ')) return s;
+  return s.replace(/\s*\/\s*$/, ' / ');
+};
+
 const parseWorkLine = (line) => {
-  if (!line.includes(' / ')) return null;
-  const slashIndex = line.indexOf(' / ');
-  const beforeSlash = line.substring(0, slashIndex).trim();
-  const workersStr = line.substring(slashIndex + 3).trim();
+  if (!hasSlash(line)) return null;
+  const normalized = normalizeSlash(line);
+  const slashIndex = normalized.indexOf(' / ');
+  const beforeSlash = normalized.substring(0, slashIndex).trim();
+  const workersStr = normalized.substring(slashIndex + 3).trim();
 
   const cleanedStr = workersStr.replace(/\([^)]*\)/g, '');
   const namePattern = /[가-힣]{2,4}(?:프로|기정|차장|TL|부장님|팀장)?/g;
@@ -52,7 +63,6 @@ const parseWorkLine = (line) => {
       foundNames.push(name);
   }
   const workers = [...new Set(foundNames)].filter(w => WORKERS.includes(w));
-  if (!workers.length) return null;
 
   let workHours = 0, startTime = '', endTime = '', timeInfo = '';
   const timeRangeMatch = beforeSlash.match(/(\d{1,2})시\s*-\s*(\d{1,2})시\s*\((\d+(?:\.\d+)?)\s*시간/);
@@ -124,9 +134,9 @@ export const parseScheduleText = (text) => {
     }
 
     if (trimmed.match(/^[■□▪▫●○◆★☆]/)) {
-      if (trimmed.includes(' / ')) {
+      if (hasSlash(trimmed)) {
         const task = parseWorkLine(trimmed);
-        if (task?.workers.length > 0) currentDay.tasks.push(task);
+        if (task) currentDay.tasks.push(task);
       } else {
         let fullContent = trimmed;
         let nextIdx = i + 1;
@@ -137,9 +147,9 @@ export const parseScheduleText = (text) => {
           nextIdx++;
           if (nextIdx - i > 5) break;
         }
-        if (fullContent.includes(' / ')) {
+        if (hasSlash(fullContent)) {
           const task = parseWorkLine(fullContent);
-          if (task?.workers.length > 0) { currentDay.tasks.push(task); i = nextIdx - 1; }
+          if (task) { currentDay.tasks.push(task); i = nextIdx - 1; }
         }
       }
     }
@@ -165,11 +175,11 @@ export const parseJobDetails = (taskName) => {
   const chamberMatch = taskName.match(/\b([A-Z]챔버|PM\d+|[A-Z]\s?Chamber)\b/);
   const chamber = chamberMatch ? chamberMatch[1] : '';
 
-  const equipIdMatch = taskName.match(/([A-Z0-9가-힣]+\s*\d+호기)/);
-  const equipmentId = equipIdMatch ? equipIdMatch[1] : '';
+  const equipIdMatch = taskName.match(/([A-Za-z0-9가-힣]+\s*\d+호기)/i);
+  const equipmentId = equipIdMatch ? equipIdMatch[1].toUpperCase() : '';
 
   const lineMatch = taskName.match(
-    /(?:프로|TL|기정|차장|팀장|부장)\s+([A-Z0-9]+[A-Za-z0-9]*)\s/
+    /(?:프로|TL|기정|차장|팀장|부장)\s*(?:\([^)]*\))?\s+([A-Z0-9][A-Za-z0-9\-]*)\s/
   );
   const line = lineMatch ? lineMatch[1] : '';
 

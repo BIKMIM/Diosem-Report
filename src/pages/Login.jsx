@@ -46,7 +46,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-logo">
           <h1>DIOSEM</h1>
-          <p>작업 결과 보고서 시스템</p>
+          <p>디오셈 작업 보고서 시스템</p>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}

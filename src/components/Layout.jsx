@@ -13,6 +13,13 @@ const CalendarIcon = () => (
     <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
   </svg>
 );
+const PlusCalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+    <line x1="12" y1="14" x2="12" y2="20"/><line x1="9" y1="17" x2="15" y2="17"/>
+  </svg>
+);
 const FileIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -26,6 +33,12 @@ const ChartIcon = () => (
     <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
   </svg>
 );
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
 const SettingsIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="3"/>
@@ -34,25 +47,26 @@ const SettingsIcon = () => (
 );
 
 export default function Layout({ children, title }) {
-  const { workerProfile, logout } = useAuth();
+  const { workerProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const navItems = [
     { path: '/', label: '홈', Icon: HomeIcon },
-    { path: '/schedule', label: '일정', Icon: CalendarIcon },
-    { path: '/reports', label: '보고서', Icon: FileIcon },
-    { path: '/payroll', label: '급여현황', Icon: ChartIcon },
+    { path: '/schedule', label: '내 일정', Icon: CalendarIcon },
+    { path: '/schedule-input', label: '주간일정', Icon: PlusCalendarIcon },
+    { path: '/write-report', label: '보고서 작성', Icon: PencilIcon },
+    { path: '/reports', label: '보고서 검색', Icon: FileIcon },
     { path: '/admin', label: '관리', Icon: SettingsIcon },
   ];
 
   return (
     <>
       <header className="app-header">
-        <h1>{title || '다이오셈 보고서'}</h1>
+        <h1>{title || '디오셈 보고서'}</h1>
         {workerProfile && (
-          <span className="user-name" onClick={logout} style={{ cursor: 'pointer' }}>
-            {workerProfile.name} ↩
+          <span className="user-name" onClick={() => navigate('/profile')} style={{ cursor: 'pointer' }}>
+            {workerProfile.name} ›
           </span>
         )}
       </header>
