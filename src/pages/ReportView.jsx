@@ -9,8 +9,8 @@ import { formatDateKo, formatHours } from '../utils/timeCalc';
 const CHAMBER_STATUS_GROUPS = [
   { label: '표면 종류', options: ['일반 알루미늄', '아노다이징', 'SUS', '나이트라이드', '세라믹'] },
   { label: '점착 / 오염', options: ['아주깨끗함', '보통', '끈적임', '잘 안지워짐', '번짐'] },
-  { label: '물질 상태', options: ['가루날림', '딱딱함', '달고나'] },
-  { label: '색깔', options: ['흰색', '회색', '갈색', '검은색', '노란색', '무지갯빛', '투명색'] },
+  { label: '오염 상태', options: ['가루날림', '딱딱함', '달고나', '깨짐', '녹여야함', '긁어야함'] },
+  { label: '오염 색깔', options: ['흰색', '회색', '갈색', '검은색', '노란색', '무지갯빛', '투명색'] },
   { label: '기타', options: ['무광', '아킹', '스크래치', '얼룩', '아노다이징 손상심함', 'D.I불림필요'] },
 ];
 const DIFFICULTY_OPTIONS = [

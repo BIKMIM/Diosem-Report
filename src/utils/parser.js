@@ -158,7 +158,37 @@ export const parseScheduleText = (text) => {
   return dailyData;
 };
 
-// Extract structured fields from taskName string
+// 8대 공정명
+const PROCESS_RE = /\b(ETCH|CVD|PVD|PHOTO|DIFF|IMP|ALD|METAL|CMP|CLN)\b/i;
+
+// 등록된 장비 모델명 (정규화 후 Set)
+const _normE = (s) => s.toLowerCase().replace(/[\s\-_+\/]/g, '');
+const KNOWN_EQUIP = new Set([
+  'qxp8300','qxp','centra','dps2','mesa','emax','endura','opus',
+  'producer','singen','sym3','tetra','ultima300','ultima200','ultimawd',
+  'ultimadome','viista','leo','pursar','qcm','sequel','altus','rpc',
+  'altusrpc','coronus','excel','inova','lam','lam2300','speed','speed200',
+  'speed300','strata','vector','supra','tera','michelan','michelanc3',
+  'michelanc4','professional','indy','rk7','rlsa','trias','vigus',
+  'challenger','ulvac','stellar','akra','bluetain','frosel',
+]);
+const isKnownEquip = (tok) => {
+  const n = _normE(tok);
+  if (n.length < 3) return false;
+  if (KNOWN_EQUIP.has(n)) return true;
+  for (const m of KNOWN_EQUIP)
+    if (m.length >= 4 && n.length >= 4 &&
+        (n.startsWith(m.slice(0,4)) || m.startsWith(n.slice(0,4)))) return true;
+  return false;
+};
+
+// 역순 파싱 헬퍼
+const isChamberDetail = (t) =>
+  /^PM\d/i.test(t) || /^ch\d/i.test(t) || /챔버$/i.test(t) ||
+  /^(T\/M|TM|L\/L|LL|Wall|LID|Dome)$/i.test(t);
+const isUnitNumber = (t) => /^\d+$/.test(t) || /^\d+호기/.test(t);
+
+// Extract structured fields from taskName string (역순 파싱)
 export const parseJobDetails = (taskName) => {
   const requesterMatch = taskName.match(/^([가-힣]{2,4}(?:프로|TL|기정|차장|팀장|부장)?)/);
   const requester = requesterMatch ? removeTitle(requesterMatch[1]) : '';
@@ -166,17 +196,8 @@ export const parseJobDetails = (taskName) => {
   const floorMatch = taskName.match(/(\d+)\s*층/);
   const floor = floorMatch ? floorMatch[1] + '층' : '';
 
-  const bayMatch = taskName.match(/([A-Z0-9]+)\s*베이/);
-  const bay = bayMatch ? bayMatch[1] + '베이' : '';
-
-  const processMatch = taskName.match(/\b(ETCH|CVD|CMP|DIFF|IMP|CLN|PHOTO)\b/);
-  const process = processMatch ? processMatch[1] : '';
-
-  const chamberMatch = taskName.match(/\b([A-Z]챔버|PM\d+|[A-Z]\s?Chamber)\b/);
-  const chamber = chamberMatch ? chamberMatch[1] : '';
-
-  const equipIdMatch = taskName.match(/([A-Za-z0-9가-힣]+\s*\d+호기)/i);
-  const equipmentId = equipIdMatch ? equipIdMatch[1].toUpperCase() : '';
+  const bayMatch = taskName.match(/([A-Z0-9]+)\s*베이/i);
+  const bay = bayMatch ? bayMatch[1].toUpperCase() + '베이' : '';
 
   const lineMatch = taskName.match(
     /(?:프로|TL|기정|차장|팀장|부장)\s*(?:\([^)]*\))?\s+([A-Z0-9][A-Za-z0-9\-]*)\s/
@@ -185,6 +206,76 @@ export const parseJobDetails = (taskName) => {
 
   const clientMatch = taskName.match(/\b(SEC|HYNIX|삼성|하이닉스)\b/i);
   const client = clientMatch ? clientMatch[1].toUpperCase() : '';
+
+  // 장비 섹션: 공정명이 있으면 공정명부터, 없으면 라인명 이후부터
+  const procMatch = taskName.match(PROCESS_RE);
+  let equipSection = '';
+  if (procMatch) {
+    equipSection = taskName.slice(procMatch.index);
+  } else if (lineMatch) {
+    equipSection = taskName.slice(lineMatch.index + lineMatch[0].length);
+  } else {
+    equipSection = taskName;
+  }
+
+  // 괄호/층/베이/기둥 제거, PM2,3 같은 콤마 구분 챔버번호는 "PM2 PM3"으로 전개
+  const cleanSection = equipSection
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\d+층/g, '')
+    .replace(/[A-Z0-9]+베이/gi, '')
+    .replace(/[A-Za-z]\d*기둥/gi, '')
+    .replace(/\b(PM\d+(?:,\s*\d+)+)/gi, (m) => {
+      // "PM2, 3, 4" → "PM2 PM3 PM4"
+      const nums = m.replace(/PM/gi, '').split(/,\s*/);
+      return nums.map(n => 'PM' + n.trim()).join(' ');
+    })
+    .replace(/,/g, ' ')
+    .trim();
+  const tokens = cleanSection.split(/\s+/).filter(Boolean);
+
+  // ── 역순 파싱 ──
+  let right = tokens.length - 1;
+
+  // Phase 1: 챔버 세부명칭 (PM1, ch1, A챔버, T/M 등) - 오른쪽에서
+  const chamberParts = [];
+  while (right >= 0 && isChamberDetail(tokens[right])) {
+    chamberParts.unshift(tokens[right]);
+    right--;
+  }
+  const chamber = chamberParts.join(', ');
+
+  // Phase 2: 호기 번호 (숫자 또는 숫자호기)
+  if (right >= 0 && isUnitNumber(tokens[right])) {
+    right--;
+  }
+
+  // Phase 3: 호기 영문명칭 (순수 알파벳)
+  // - 호기번호가 있었으면 → 무조건 호기명
+  // - 호기번호가 없어도 → 등록 장비명이 아니면 호기명 (영업팀 미기재 케이스)
+  if (right >= 0) {
+    const tok = tokens[right];
+    const hadUnitNum = tokens[right + 1] !== undefined && isUnitNumber(tokens[right + 1]);
+    const isPureAlpha = /^[A-Za-z]+$/.test(tok);
+    // 호기번호가 있었으면 무조건 호기명.
+    // 호기번호가 없어도 등록 장비명이 아니면 호기명 (영업팀 미기재 케이스).
+    // 단, 등록 장비명(ULTIMA 등)은 장비명으로 유지.
+    if (isPureAlpha && (hadUnitNum || !isKnownEquip(tok))) {
+      right--;
+    }
+  }
+
+  // Phase 4: 나머지 왼쪽 = 공정명 + 장비명 [+ 장비세부명칭]
+  const remaining = tokens.slice(0, right + 1);
+  let process = '';
+  const equipParts = [];
+  for (const tok of remaining) {
+    if (!process && PROCESS_RE.test(tok)) {
+      process = tok.toUpperCase();
+    } else if (/^[A-Za-z]/.test(tok)) {
+      equipParts.push(tok.toUpperCase());
+    }
+  }
+  const equipmentId = equipParts.join(' ');
 
   return { requester, floor, bay, process, chamber, equipmentId, line, client };
 };

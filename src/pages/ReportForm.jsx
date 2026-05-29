@@ -13,8 +13,8 @@ import { isSpecialWork } from '../utils/holidays';
 const CHAMBER_STATUS_GROUPS = [
   { label: '표면 종류', options: ['일반 알루미늄', '아노다이징', 'SUS', '나이트라이드', '세라믹'] },
   { label: '점착 / 오염', options: ['아주깨끗함', '보통', '끈적임', '잘 안지워짐', '번짐'] },
-  { label: '물질 상태', options: ['가루날림', '딱딱함', '달고나'] },
-  { label: '색깔', options: ['흰색', '회색', '갈색', '검은색', '노란색', '무지갯빛', '투명색'] },
+  { label: '오염 상태', options: ['가루날림', '딱딱함', '달고나', '깨짐', '녹여야함', '긁어야함'] },
+  { label: '오염 색깔', options: ['흰색', '회색', '갈색', '검은색', '노란색', '무지갯빛', '투명색'] },
   { label: '기타', options: ['무광', '아킹', '스크래치', '얼룩', '아노다이징 손상심함', 'D.I불림필요'] },
 ];
 const DIFFICULTY_OPTIONS = [
@@ -561,7 +561,7 @@ export default function ReportForm() {
               {specialWork && <span className="badge badge-special" style={{ marginLeft: 6 }}>특근</span>}
             </div>
             <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--gray-900)', lineHeight: 1.3 }}>
-              {[job.line, job.equipmentId || job.chamber].filter(Boolean).join(' · ') || job.taskName?.slice(0, 30)}
+              {[job.line, [job.process, job.equipmentId].filter(Boolean).join(' ') || job.chamber].filter(Boolean).join(' · ') || job.taskName?.slice(0, 30)}
             </div>
           </div>
           <div style={{ fontSize: 18, color: 'var(--gray-400)', transition: 'transform 0.2s', transform: jobInfoOpen ? 'rotate(180deg)' : 'none', flexShrink: 0, marginLeft: 8 }}>
@@ -599,8 +599,8 @@ export default function ReportForm() {
         const withNotes = allHistory.filter(r => r.notes);
 
         const lineName = job?.line || '';
-        const equipName = job?.equipmentId || job?.chamber || '';
-        const locationLabel = [lineName, equipName].filter(Boolean).join(' ');
+        const equipName = [job?.process, job?.equipmentId].filter(Boolean).join(' ') || job?.chamber || '';
+        const locationLabel = [lineName, equipName].filter(Boolean).join(' · ');
 
         const dismiss = () => {
           setHistoryPopupDismissed(true);

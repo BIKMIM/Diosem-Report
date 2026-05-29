@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, updateDoc, doc, query, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, query, orderBy, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import { DEFAULT_EQUIPMENT_NAMES, loadEquipmentNames, saveEquipmentNames } from '../utils/equipmentNames';
 import { DEFAULT_LINES, loadLines, saveLines } from '../utils/lineNames';
+import { parseJobDetails } from '../utils/parser';
 
 export default function AdminPanel() {
   const { workerProfile } = useAuth();
@@ -13,6 +14,8 @@ export default function AdminPanel() {
 
   const [tab, setTab] = useState('workers');
   const [loading, setLoading] = useState(true);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState('');
 
   // Workers / Jobs
   const [workers, setWorkers] = useState([]);
@@ -62,6 +65,39 @@ export default function AdminPanel() {
     if (!window.confirm('이 작업을 삭제하시겠습니까?')) return;
     await deleteDoc(doc(db, 'jobs', jobId));
     setJobs(js => js.filter(j => j.id !== jobId));
+  };
+
+  const migrateJobs = async () => {
+    if (!window.confirm(`저장된 작업 ${jobs.length}건을 최신 파서로 재처리합니다. 계속하시겠습니까?`)) return;
+    setMigrating(true);
+    setMigrateResult('');
+    try {
+      let updated = 0;
+      // Firestore writeBatch: max 500 per batch
+      for (let i = 0; i < jobs.length; i += 400) {
+        const chunk = jobs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        for (const job of chunk) {
+          if (!job.taskName) continue;
+          const details = parseJobDetails(job.taskName);
+          batch.update(doc(db, 'jobs', job.id), {
+            process: details.process,
+            equipmentId: details.equipmentId,
+            chamber: details.chamber,
+            floor: details.floor || job.floor || '',
+            bay: details.bay || job.bay || '',
+          });
+          updated++;
+        }
+        await batch.commit();
+      }
+      setMigrateResult(`✅ ${updated}건 업데이트 완료`);
+      await loadData();
+    } catch (e) {
+      setMigrateResult('❌ 오류: ' + e.message);
+    } finally {
+      setMigrating(false);
+    }
   };
 
   // ── Equipment names ──
@@ -179,7 +215,23 @@ export default function AdminPanel() {
         </>
       ) : tab === 'jobs' ? (
         <>
-          <div style={{ fontSize: 13, color: 'var(--gray-500)', marginBottom: 8 }}>총 {jobs.length}건</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+            <div style={{ fontSize: 13, color: 'var(--gray-500)', flex: 1 }}>총 {jobs.length}건</div>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={migrateJobs}
+              disabled={migrating}
+              style={{ flexShrink: 0 }}
+            >
+              {migrating ? '처리 중...' : '장비명 재파싱'}
+            </button>
+          </div>
+          {migrateResult && (
+            <div className={`alert ${migrateResult.startsWith('✅') ? 'alert-success' : 'alert-error'}`}
+              style={{ marginBottom: 10 }}>
+              {migrateResult}
+            </div>
+          )}
           {jobs.slice(0, 50).map(j => (
             <div key={j.id} className="card" style={{ padding: '12px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
